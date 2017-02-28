@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">CameraSDK_API2</string>
+
+    <string name="take_picture">Take Picture</string>
+</resources>
