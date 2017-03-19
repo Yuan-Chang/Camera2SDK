@@ -24,7 +24,6 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
@@ -188,17 +187,65 @@ public class Camera2Fragment extends Fragment {
             if (texture == null || cameraDevice == null)
                 return;
 
+            HandlerThread thread = new HandlerThread("");
+            thread.start();
+            final Handler handler = new Handler(thread.getLooper());
+
             texture.setDefaultBufferSize(imageDimension.getWidth(), imageDimension.getHeight());
 
             Surface surface = new Surface(texture);
             //set capture request as 'preview' mode
             captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
 
+
+            CameraManager manager = (CameraManager) getActivity().getSystemService(Context.CAMERA_SERVICE);
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraDevice.getId());
+            Size[] imageSize = null;
+            if (characteristics != null) {
+                imageSize = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.YUV_420_888);
+            }
+            int width = 640;
+            int height = 480;
+            if (imageSize != null && 0 < imageSize.length) {
+                width = imageSize[0].getWidth();
+                height = imageSize[0].getHeight();
+            }
+
+            imageReader = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 1);
+            List<Surface> outputSurfaces = new ArrayList<Surface>();
+            outputSurfaces.add(imageReader.getSurface());
+            outputSurfaces.add(surface);
+
             //set output target
             captureRequestBuilder.addTarget(surface);
+            captureRequestBuilder.addTarget(imageReader.getSurface());
+
+
+            final int fwidth = width;
+            final int fheight = height;
+            imageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+                @Override
+                public void onImageAvailable(ImageReader reader) {
+                    Image image = null;
+                    try {
+                        image = reader.acquireLatestImage();
+                        ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                        byte[] bytes = new byte[buffer.capacity()];
+                        buffer.get(bytes);
+
+                        if (imageLiveFrameListener != null)
+                            imageLiveFrameListener.onImageLiveFrame(bytes,fwidth,fheight);
+
+                    } finally {
+                        if (image != null) {
+                            image.close();
+                        }
+                    }
+                }
+            }, handler);
 
             //create session
-            cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback(){
+            cameraDevice.createCaptureSession(outputSurfaces, new CameraCaptureSession.StateCallback(){
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
                     //The camera is already closed
@@ -211,7 +258,7 @@ public class Camera2Fragment extends Fragment {
                     //1st param => set up camera display effect( ex. it can be set to black & while)
                     captureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
                     try {
-                        cameraCaptureSessions.setRepeatingRequest(captureRequestBuilder.build(), null, null);
+                        cameraCaptureSessions.setRepeatingRequest(captureRequestBuilder.build(), null, handler);
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }
@@ -220,7 +267,7 @@ public class Camera2Fragment extends Fragment {
                 public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
                     Toast.makeText(getActivity(), "Configuration change", Toast.LENGTH_SHORT).show();
                 }
-            }, null);
+            }, handler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -368,4 +415,13 @@ public class Camera2Fragment extends Fragment {
         imageTakenListener = onImageTakenListener;
     }
 
+    OnImageLiveFrameListener imageLiveFrameListener;
+
+    public interface OnImageLiveFrameListener{
+        void onImageLiveFrame(byte[] bytes, int width, int height);
+    }
+
+    public void setOnImageLiveFrameListener(OnImageLiveFrameListener onImageLiveFrameListener){
+        imageLiveFrameListener = onImageLiveFrameListener;
+    }
 }

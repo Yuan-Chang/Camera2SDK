@@ -1,50 +1,17 @@
 package yc.com.cameraapi2;
 
-import android.Manifest;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.ImageFormat;
-import android.graphics.SurfaceTexture;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CameraCharacteristics;
-import android.hardware.camera2.CameraDevice;
-import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.CameraMetadata;
-import android.hardware.camera2.CaptureRequest;
-import android.hardware.camera2.TotalCaptureResult;
-import android.hardware.camera2.params.StreamConfigurationMap;
-import android.media.Image;
-import android.media.ImageReader;
-import android.os.Environment;
-import android.os.Handler;
-import android.os.HandlerThread;
 import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.util.Size;
-import android.util.SparseIntArray;
-import android.view.Surface;
-import android.view.TextureView;
-import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
 import intuit.com.UILoggerSDK.UILogger;
 import yc.com.camerasdk_api2.Camera2;
 import yc.com.camerasdk_api2.Camera2Fragment;
@@ -69,7 +36,7 @@ public class MainActivity extends AppCompatActivity {
         //Remove title bar
         this.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
-//Remove notification bar
+        //Remove notification bar
         this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
         setContentView(R.layout.activity_main);
@@ -83,6 +50,22 @@ public class MainActivity extends AppCompatActivity {
                 Bitmap bitmap = Utils_ImageHandler.getBitmapFromBytes(bytes);
                 bitmap = Utils_ImageHandler.RotateBitmap(bitmap,90);
                 UILogger.getLogger().addLogAndUpdateUI(bitmap);
+            }
+        });
+
+        final Date previousTime = new Date();
+        camera2Fragment.setOnImageLiveFrameListener(new Camera2Fragment.OnImageLiveFrameListener() {
+            @Override
+            public void onImageLiveFrame(byte[] bytes, int width, int height) {
+                Log.d("yc","yc live frame");
+                long diffInMs = new Date().getTime() - previousTime.getTime();
+                long diffInSec = TimeUnit.MILLISECONDS.toSeconds(diffInMs);
+                if (diffInSec > 5)
+                {
+//                    Bitmap bitmap = Utils_ImageHandler.getBitmapFromNV21(bytes,width,height);
+//                    bitmap = Utils_ImageHandler.RotateBitmap(bitmap,90);
+//                    UILogger.getLogger().addLogAndUpdateUI(bitmap);
+                }
             }
         });
 
